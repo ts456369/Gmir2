@@ -1,4 +1,5 @@
 ﻿using Server.MirDatabase;
+using System.Collections.Generic;
 using S = ServerPackets;
 
 namespace Server.MirObjects.Monsters
@@ -9,7 +10,7 @@ namespace Server.MirObjects.Monsters
         {
             get
             {
-                return 8;
+                return 6;
             }
         }
 
@@ -25,7 +26,6 @@ namespace Server.MirObjects.Monsters
 
         protected override void Attack()
         {
-
             if (!Target.IsAttackTarget(this))
             {
                 Target = null;
@@ -43,39 +43,43 @@ namespace Server.MirObjects.Monsters
             if (!ranged)
             {
                 Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation });
-                int damage = GetAttackPower(MinDC, MaxDC);
+                int damage = GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC]);
                 if (damage == 0) return;
-                Target.Attacked(this, damage, DefenceType.ACAgility);
+
+                DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, Target, damage, DefenceType.ACAgility);
+                ActionList.Add(action);
             }
             else
             {
                 Broadcast(new S.ObjectRangeAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, TargetID = Target.ObjectID });
-                AttackTime = Envir.Time + AttackSpeed + 500;
-                int damage = GetAttackPower(MinMC, MaxMC);
-                if (damage == 0) return;
 
-                
-                if (Envir.Random.Next(8) > 0) // Random chance to poison
-                {
-                    if (Envir.Random.Next(Settings.PoisonResistWeight) >= Target.PoisonResist)
-                    {
-                        if (Envir.Random.Next(1) > 0) // Random chance for poison to be either Green or Red (set to 50/50 chance)
-                        {
-                            Target.ApplyPoison(new Poison { Owner = this, Duration = 5, PType = PoisonType.Green, Value = GetAttackPower(MinSC, MaxSC), TickSpeed = 2000 }, this);
-                        }
-                        else
-                        {
-                            Target.ApplyPoison(new Poison { Owner = this, Duration = 5, PType = PoisonType.Red, Value = GetAttackPower(MinSC, MaxSC), TickSpeed = 2000 }, this);
-                        }
-                    }
-                }
+                AttackTime = Envir.Time + AttackSpeed + 500;
+                int damage = GetAttackPower(Stats[Stat.MinMC], Stats[Stat.MaxMC]);
+                if (damage == 0) return;
 
                 DelayedAction action = new DelayedAction(DelayedType.RangeDamage, Envir.Time + 500, Target, damage, DefenceType.MAC);
                 ActionList.Add(action);
             }
+        }
 
-            if (Target.Dead)
-                FindTarget();
+        protected override void CompleteRangeAttack(IList<object> data)
+        {
+            MapObject target = (MapObject)data[0];
+            int damage = (int)data[1];
+            DefenceType defence = (DefenceType)data[2];
+
+            if (target == null || !target.IsAttackTarget(this) || target.CurrentMap != CurrentMap || target.Node == null) return;
+
+            target.Attacked(this, damage, defence);
+
+            if (Envir.Random.Next(1) > 0) // Random chance for poison to be either Green or Red (set to 50/50 chance)
+            {
+                PoisonTarget(target, 8, 5, PoisonType.Green, 2000);
+            }
+            else
+            {
+                PoisonTarget(target, 8, 5, PoisonType.Red, 2000);
+            }
         }
 
         protected override void ProcessTarget()

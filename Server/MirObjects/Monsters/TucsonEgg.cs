@@ -10,7 +10,6 @@ namespace Server.MirObjects.Monsters
     {
         protected override bool CanMove { get { return false; } }
 
-
         protected internal TucsonEgg(MonsterInfo info)
             : base(info)
         {
@@ -50,21 +49,21 @@ namespace Server.MirObjects.Monsters
             switch (type)
             {
                 case DefenceType.ACAgility:
-                    if (Envir.Random.Next(Agility + 1) > attacker.Accuracy) return 0;
-                    armour = GetDefencePower(MinAC, MaxAC);
+                    if (Envir.Random.Next(Stats[Stat.Agility] + 1) > attacker.Stats[Stat.Accuracy]) return 0;
+                    armour = GetDefencePower(Stats[Stat.MinAC], Stats[Stat.MaxAC]);
                     break;
                 case DefenceType.AC:
-                    armour = GetDefencePower(MinAC, MaxAC);
+                    armour = GetDefencePower(Stats[Stat.MinAC], Stats[Stat.MaxAC]);
                     break;
                 case DefenceType.MACAgility:
-                    if (Envir.Random.Next(Agility + 1) > attacker.Accuracy) return 0;
-                    armour = GetDefencePower(MinMAC, MaxMAC);
+                    if (Envir.Random.Next(Stats[Stat.Agility] + 1) > attacker.Stats[Stat.Accuracy]) return 0;
+                    armour = GetDefencePower(Stats[Stat.MinMAC], Stats[Stat.MaxMAC]);
                     break;
                 case DefenceType.MAC:
-                    armour = GetDefencePower(MinMAC, MaxMAC);
+                    armour = GetDefencePower(Stats[Stat.MinMAC], Stats[Stat.MaxMAC]);
                     break;
                 case DefenceType.Agility:
-                    if (Envir.Random.Next(Agility + 1) > attacker.Accuracy) return 0;
+                    if (Envir.Random.Next(Stats[Stat.Agility] + 1) > attacker.Stats[Stat.Accuracy]) return 0;
                     break;
             }
 
@@ -104,21 +103,21 @@ namespace Server.MirObjects.Monsters
             switch (type)
             {
                 case DefenceType.ACAgility:
-                    if (Envir.Random.Next(Agility + 1) > attacker.Accuracy) return 0;
-                    armour = GetDefencePower(MinAC, MaxAC);
+                    if (Envir.Random.Next(Stats[Stat.Agility] + 1) > attacker.Stats[Stat.Accuracy]) return 0;
+                    armour = GetDefencePower(Stats[Stat.MinAC], Stats[Stat.MaxAC]);
                     break;
                 case DefenceType.AC:
-                    armour = GetDefencePower(MinAC, MaxAC);
+                    armour = GetDefencePower(Stats[Stat.MinAC], Stats[Stat.MaxAC]);
                     break;
                 case DefenceType.MACAgility:
-                    if (Envir.Random.Next(Agility + 1) > attacker.Accuracy) return 0;
-                    armour = GetDefencePower(MinMAC, MaxMAC);
+                    if (Envir.Random.Next(Stats[Stat.Agility] + 1) > attacker.Stats[Stat.Accuracy]) return 0;
+                    armour = GetDefencePower(Stats[Stat.MinMAC], Stats[Stat.MaxMAC]);
                     break;
                 case DefenceType.MAC:
-                    armour = GetDefencePower(MinMAC, MaxMAC);
+                    armour = GetDefencePower(Stats[Stat.MinMAC], Stats[Stat.MaxMAC]);
                     break;
                 case DefenceType.Agility:
-                    if (Envir.Random.Next(Agility + 1) > attacker.Accuracy) return 0;
+                    if (Envir.Random.Next(Stats[Stat.Agility] + 1) > attacker.Stats[Stat.Accuracy]) return 0;
                     break;
             }
 
@@ -174,21 +173,41 @@ namespace Server.MirObjects.Monsters
 
             for (int i = 0; i < targets.Count; i++)
             {
-                int damage = GetAttackPower(MinDC, MaxDC);
+                int damage = GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC]);
                 if (damage == 0) return;
 
                 if (targets[i].Attacked(this, damage, DefenceType.MAC) <= 0) return;
 
-                if (Envir.Random.Next(3) == 0)
-                    targets[i].ApplyPoison(new Poison { Owner = this, Duration = 5, PType = PoisonType.Green, Value = GetAttackPower(MinSC, MaxSC), TickSpeed = 2000 }, this);
+                PoisonTarget(targets[i], 3, 5, PoisonType.Green, 2000);
             }
-
         }
 
         public override void Die()
         {
             ActionList.Add(new DelayedAction(DelayedType.Damage, Envir.Time + 300));
+
+            if (Info.Effect == 1)
+            {
+                SpawnSlave();
+            }
+
             base.Die();
+        }
+
+        private void SpawnSlave()
+        {
+            ActionTime = Envir.Time + 300;
+            AttackTime = Envir.Time + AttackSpeed;
+
+            var mob = GetMonster(Envir.GetMonsterInfo(Settings.TucsonGeneralEgg));
+
+            if (mob == null) return;
+
+            if (!mob.Spawn(CurrentMap, Front))
+                mob.Spawn(CurrentMap, CurrentLocation);
+
+            mob.Target = Target;
+            mob.ActionTime = Envir.Time + 2000;
         }
     }
 }

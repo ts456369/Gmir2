@@ -25,19 +25,19 @@ namespace Server.MirObjects.Monsters
 
             if (x > 2 || y > 2) return false;
 
-
             return (x <= 1 && y <= 1) || (x == y || x % 2 == y % 2);
         }
 
         protected override void Attack()
         {
-
             if (!Target.IsAttackTarget(this))
             {
                 Target = null;
                 return;
             }
 
+            ActionTime = Envir.Time + 300;
+            AttackTime = Envir.Time + AttackSpeed;
             Direction = Functions.DirectionFromPoint(CurrentLocation, Target.CurrentLocation);
 
             bool range = !Functions.InRange(CurrentLocation, Target.CurrentLocation, 1);
@@ -45,70 +45,32 @@ namespace Server.MirObjects.Monsters
             if (!range && Envir.Random.Next(5) > 0)
             {
                 Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation });
-                Attack1(1);
+
+                int damage = GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC]);
+                if (damage == 0) return;
+
+                HalfmoonAttack(damage, 300);
             }
             else
             {
                 Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, Type = 1 });
-                Attack2(2);
+                SmashAttack(1);
             }
 
-            ActionTime = Envir.Time + 300;
-            AttackTime = Envir.Time + AttackSpeed;
             ShockTime = 0;
-
-
         }
 
-        private void Attack1(int distance)
+        private void SmashAttack(int radius)
         {
-            List<MapObject> targets = FindAllTargets(1, CurrentLocation);
-            if (targets.Count == 0) return;
-
-            for (int i = 0; i < 4; i++)
-            {
-                int damage = GetAttackPower(MinDC, MaxDC);
-                if (damage == 0) return;
-                Target.Attacked(this, damage, DefenceType.ACAgility);
-            }
-
-        }
-
-        private void Attack2(int distance)
-        {
-            int damage = GetAttackPower(MinDC, MaxDC * 2);
+            int damage = GetAttackPower(Stats[Stat.MinMC], Stats[Stat.MaxMC]);
             if (damage == 0) return;
 
-            for (int i = 1; i <= distance; i++)
+            var targets = FindAllTargets(radius, Target.CurrentLocation, false);
+
+            for (int i = 0; i < targets.Count; i++)
             {
-                Point target = Functions.PointMove(CurrentLocation, Direction, i);
-
-                if (target == Target.CurrentLocation)
-                {
-                    Target.Attacked(this, damage, DefenceType.ACAgility);
-                }
-                else
-                {
-                    if (!CurrentMap.ValidPoint(target)) continue;
-
-                    Cell cell = CurrentMap.GetCell(target);
-                    if (cell.Objects == null) continue;
-
-                    for (int o = 0; o < cell.Objects.Count; o++)
-                    {
-                        MapObject ob = cell.Objects[o];
-                        if (ob.Race == ObjectType.Monster || ob.Race == ObjectType.Player)
-                        {
-                            if (!ob.IsAttackTarget(this)) continue;
-
-                            ob.Attacked(this, damage, DefenceType.ACAgility);
-                        }
-                        else continue;
-
-                        break;
-                    }
-
-                }
+                DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, targets[i], damage, DefenceType.ACAgility);
+                ActionList.Add(action);
             }
         }
     }

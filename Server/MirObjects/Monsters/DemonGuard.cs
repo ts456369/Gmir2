@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 namespace Server.MirObjects.Monsters
 {
-    class DemonGuard : ZumaMonster
+    public class DemonGuard : ZumaMonster
     {
         public uint RevivalCount;
         public int LifeCount;
@@ -27,7 +27,6 @@ namespace Server.MirObjects.Monsters
 
         protected override void Attack()
         {
-
             if (!Target.IsAttackTarget(this))
             {
                 Target = null;
@@ -44,16 +43,20 @@ namespace Server.MirObjects.Monsters
             if (Envir.Random.Next(3) > 0)
             {
                 Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation });
-                int damage = GetAttackPower(MinDC, MaxDC);
+                int damage = GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC]);
                 if (damage == 0) return;
-                Target.Attacked(this, damage, DefenceType.ACAgility);
+
+                DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, Target, damage, DefenceType.ACAgility);
+                ActionList.Add(action);
             }
             else
             {
                 Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, Type = 1 });
-                int damage = GetAttackPower(MinDC, MaxDC * 2);
+                int damage = GetAttackPower(Stats[Stat.MinMC], Stats[Stat.MaxMC]);
                 if (damage == 0) return;
-                Target.Attacked(this, damage, DefenceType.ACAgility);
+
+                DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, Target, damage, DefenceType.ACAgility);
+                ActionList.Add(action);
 
             }
 
@@ -66,19 +69,17 @@ namespace Server.MirObjects.Monsters
             base.Die();
         }
 
-
         protected override void ProcessAI()
         {
             if (Dead && Envir.Time > DieTime + RevivalTime && RevivalCount < LifeCount)
             {
                 RevivalCount++;
 
-                uint newhp = MaxHP * (100 - (25 * RevivalCount)) / 100;
+                int newhp = (int)(Stats[Stat.HP] * (100 - (25 * RevivalCount)) / 100);
                 Revive(newhp, false);
             }
 
             base.ProcessAI();
         }
-
     }
 }

@@ -34,7 +34,7 @@ namespace Client.MirScenes.Dialogs
         public MirImageControl ExperienceBar, WeightBar, LeftCap, RightCap;
         public MirButton GameShopButton, MenuButton, InventoryButton, CharacterButton, SkillButton, QuestButton, OptionButton;
         public MirControl HealthOrb;
-        public MirLabel HealthLabel, ManaLabel, TopLabel, BottomLabel, LevelLabel, CharacterName, ExperienceLabel, GoldLabel, WeightLabel, SpaceLabel, AModeLabel, PModeLabel, SModeLabel, PingLabel;
+        public MirLabel HealthLabel, ManaLabel, TopLabel, BottomLabel, LevelLabel, CharacterName, ExperienceLabel, GoldLabel, WeightLabel, SpaceLabel, AModeLabel, PModeLabel, SModeLabel;
 
         public MirButton CustomButton1, CustomButton2;
 
@@ -49,16 +49,6 @@ namespace Client.MirScenes.Dialogs
             Library = Libraries.Prguse;
             Location = new Point(((Settings.ScreenWidth / 2) - (Size.Width / 2)), Settings.ScreenHeight - Size.Height);
             PixelDetect = true;
-
-            PingLabel = new MirLabel
-            {
-                AutoSize = true,
-                ForeColour = Color.Yellow,
-                OutLineColour = Color.Black,
-                Parent = this,
-                Location = new Point(Settings.Resolution != 800 ? 899 : 675, Settings.Resolution != 800 ? -443 : -265),
-                Visible = false
-            };
 
             LeftCap = new MirImageControl
             {
@@ -437,16 +427,6 @@ namespace Client.MirScenes.Dialogs
                     break;
             }
 
-            if ((CMain.PingTime) > 100)
-            {
-                PingLabel.Text = string.Format("Ping: {0}", CMain.PingTime);
-                PingLabel.Visible = true;
-            }
-            else
-            {
-                PingLabel.Visible = false;
-            }
-
             switch (Settings.SkillMode)
             {
                 case true:
@@ -459,8 +439,8 @@ namespace Client.MirScenes.Dialogs
 
             if (Settings.HPView)
             {
-                HealthLabel.Text = string.Format("HP {0}/{1}", User.HP, User.MaxHP);
-                ManaLabel.Text = HPOnly ? "" : string.Format("MP {0}/{1} ", User.MP, User.MaxMP);
+                HealthLabel.Text = string.Format("HP {0}/{1}", User.HP, User.Stats[Stat.HP]);
+                ManaLabel.Text = HPOnly ? "" : string.Format("MP {0}/{1} ", User.MP, User.Stats[Stat.MP]);
                 TopLabel.Text = string.Empty;
                 BottomLabel.Text = string.Empty;
             }
@@ -469,12 +449,12 @@ namespace Client.MirScenes.Dialogs
                 if (HPOnly)
                 {
                     TopLabel.Text = string.Format("{0}\n" + "--", User.HP);
-                    BottomLabel.Text = string.Format("{0}", User.MaxHP);
+                    BottomLabel.Text = string.Format("{0}", User.Stats[Stat.HP]);
                 }
                 else
                 {
                     TopLabel.Text = string.Format(" {0}    {1} \n" + "---------------", User.HP, User.MP);
-                    BottomLabel.Text = string.Format(" {0}    {1} ", User.MaxHP, User.MaxMP);
+                    BottomLabel.Text = string.Format(" {0}    {1} ", User.Stats[Stat.HP], User.Stats[Stat.MP]);
                 }
                 HealthLabel.Text = string.Empty;
                 ManaLabel.Text = string.Empty;
@@ -486,7 +466,7 @@ namespace Client.MirScenes.Dialogs
             GoldLabel.Text = GameScene.Gold.ToString("###,###,##0");
             CharacterName.Text = User.Name;
             SpaceLabel.Text = User.Inventory.Count(t => t == null).ToString();
-            WeightLabel.Text = (MapObject.User.MaxBagWeight - MapObject.User.CurrentBagWeight).ToString();
+            WeightLabel.Text = (MapObject.User.Stats[Stat.BagWeight] - MapObject.User.CurrentBagWeight).ToString();
         }
 
         private void Label_SizeChanged(object sender, EventArgs e)
@@ -501,8 +481,8 @@ namespace Client.MirScenes.Dialogs
             if (Libraries.Prguse == null) return;
 
             int height;
-            if (User != null && User.HP != User.MaxHP)
-                height = (int)(80 * User.HP / (float)User.MaxHP);
+            if (User != null && User.HP != User.Stats[Stat.HP])
+                height = (int)(80 * User.HP / (float)User.Stats[Stat.HP]);
             else
                 height = 80;
 
@@ -524,8 +504,8 @@ namespace Client.MirScenes.Dialogs
 
             if (hpOnly) return;
 
-            if (User.MP != User.MaxMP)
-                height = (int)(80 * User.MP / (float)User.MaxMP);
+            if (User.MP != User.Stats[Stat.MP])
+                height = (int)(80 * User.MP / (float)User.Stats[Stat.MP]);
             else
                 height = 80;
 
@@ -555,7 +535,7 @@ namespace Client.MirScenes.Dialogs
         private void WeightBar_BeforeDraw(object sender, EventArgs e)
         {
             if (WeightBar.Library == null) return;
-            double percent = MapObject.User.CurrentBagWeight / (double)MapObject.User.MaxBagWeight;
+            double percent = MapObject.User.CurrentBagWeight / (double)MapObject.User.Stats[Stat.BagWeight];
             if (percent > 1) percent = 1;
             if (percent <= 0) return;
 
@@ -1816,7 +1796,7 @@ namespace Client.MirScenes.Dialogs
         {
             if (WeightBar.Library == null) return;
 
-            double percent = MapObject.User.CurrentBagWeight / (double)MapObject.User.MaxBagWeight;
+            double percent = MapObject.User.CurrentBagWeight / (double)MapObject.User.Stats[Stat.BagWeight];
             if (percent > 1) percent = 1;
             if (percent <= 0) return;
 
@@ -1874,7 +1854,6 @@ namespace Client.MirScenes.Dialogs
                     SoundManager.PlaySound(20000 + (ushort)Spell.MagicShield * 10);
                     break;
             }
-
         }
     }
     public sealed class BeltDialog : MirImageControl
@@ -2027,7 +2006,7 @@ namespace Client.MirScenes.Dialogs
         public MirLabel[] KeyNameLabels = new MirLabel[8];
         public MirLabel BindNumberLabel = new MirLabel();
 
-        public MirAnimatedControl[] CoolDowns = new MirAnimatedControl[8];
+        public MirImageControl[] CoolDowns = new MirImageControl[8];
 
         public SkillBarDialog()
         {
@@ -2071,15 +2050,13 @@ namespace Client.MirScenes.Dialogs
                         GameScene.Scene.UseSpell(j + (8 * BarIndex));
                     };
 
-                CoolDowns[i] = new MirAnimatedControl
+                CoolDowns[i] = new MirImageControl
                 {
                     Library = Libraries.Prguse2,
                     Parent = this,
                     Location = new Point(i * 25 + 15, 3),
                     NotControl = true,
                     UseOffSet = true,
-                    Loop = false,
-                    Animated = false,
                     Opacity = 0.6F
                 };
             }
@@ -2170,6 +2147,7 @@ namespace Client.MirScenes.Dialogs
                 if ((m.Key < (BarIndex * 8)+1) || (m.Key > ((BarIndex + 1) * 8)+1)) continue;
                 HasSkill = true;
             }
+
             if (!Visible) return;
             Index = 2190;
             _switchBindsButton.Index = 2247;
@@ -2199,8 +2177,6 @@ namespace Client.MirScenes.Dialogs
 
                     KeyNameLabels[i - 1].Text = "";
                 }
-
-                CoolDowns[i - 1].Dispose();
             }
         }
 
@@ -2225,10 +2201,12 @@ namespace Client.MirScenes.Dialogs
                     int totalFrames = 22;
                     long timeLeft = magic.CastTime + magic.Delay - CMain.Time;
 
-                    if (timeLeft < 100 || (CoolDowns[i] != null && CoolDowns[i].Animated))
+                    if (timeLeft < 100)
                     {
-                        if (timeLeft > 0)
-                            CoolDowns[i].Dispose();
+                        if (timeLeft > 0) { 
+                            CoolDowns[i].Visible = false;
+                           // CoolDowns[i].Dispose();
+                        }
                         else
                             continue;
                     }
@@ -2236,24 +2214,10 @@ namespace Client.MirScenes.Dialogs
                     int delayPerFrame = (int)(magic.Delay / totalFrames);
                     int startFrame = totalFrames - (int)(timeLeft / delayPerFrame);
 
-                    if ((CMain.Time <= magic.CastTime + magic.Delay) && magic.CastTime > 0)
+                    if ((CMain.Time <= magic.CastTime + magic.Delay))
                     {
-                        CoolDowns[i].Dispose();
-
-                        CoolDowns[i] = new MirAnimatedControl
-                        {
-                            Index = 1260 + startFrame,
-                            AnimationCount = (totalFrames - startFrame),
-                            AnimationDelay = delayPerFrame,
-                            Library = Libraries.Prguse2,
-                            Parent = this,
-                            Location = new Point(i * 25 + 15, 3),
-                            NotControl = true,
-                            UseOffSet = true,
-                            Loop = false,
-                            Animated = true,
-                            Opacity = 0.6F
-                        };
+                        CoolDowns[i].Visible = true;
+                        CoolDowns[i].Index = 1260 + startFrame;
                     }
                 }
             }
@@ -2358,19 +2322,19 @@ namespace Client.MirScenes.Dialogs
             };
             StatusPage.BeforeDraw += (o, e) =>
             {
-                ACLabel.Text = string.Format("{0}-{1}", MapObject.User.MinAC, MapObject.User.MaxAC);
-                MACLabel.Text = string.Format("{0}-{1}", MapObject.User.MinMAC, MapObject.User.MaxMAC);
-                DCLabel.Text = string.Format("{0}-{1}", MapObject.User.MinDC, MapObject.User.MaxDC);
-                MCLabel.Text = string.Format("{0}-{1}", MapObject.User.MinMC, MapObject.User.MaxMC);
-                SCLabel.Text = string.Format("{0}-{1}", MapObject.User.MinSC, MapObject.User.MaxSC);
-                HealthLabel.Text = string.Format("{0}/{1}", MapObject.User.HP, MapObject.User.MaxHP);
-                ManaLabel.Text = string.Format("{0}/{1}", MapObject.User.MP, MapObject.User.MaxMP);
-                CritRLabel.Text = string.Format("{0}%", MapObject.User.CriticalRate);
-                CritDLabel.Text = string.Format("{0}", MapObject.User.CriticalDamage);
-                AttkSpdLabel.Text = string.Format("{0}", MapObject.User.ASpeed);
-                AccLabel.Text = string.Format("+{0}", MapObject.User.Accuracy);
-                AgilLabel.Text = string.Format("+{0}", MapObject.User.Agility);
-                LuckLabel.Text = string.Format("{0}", MapObject.User.Luck);
+                ACLabel.Text = string.Format("{0}-{1}", MapObject.User.Stats[Stat.MinAC], MapObject.User.Stats[Stat.MaxAC]);
+                MACLabel.Text = string.Format("{0}-{1}", MapObject.User.Stats[Stat.MinMAC], MapObject.User.Stats[Stat.MaxMAC]);
+                DCLabel.Text = string.Format("{0}-{1}", MapObject.User.Stats[Stat.MinDC], MapObject.User.Stats[Stat.MaxDC]);
+                MCLabel.Text = string.Format("{0}-{1}", MapObject.User.Stats[Stat.MinMC], MapObject.User.Stats[Stat.MaxMC]);
+                SCLabel.Text = string.Format("{0}-{1}", MapObject.User.Stats[Stat.MinSC], MapObject.User.Stats[Stat.MaxSC]);
+                HealthLabel.Text = string.Format("{0}/{1}", MapObject.User.HP, MapObject.User.Stats[Stat.HP]);
+                ManaLabel.Text = string.Format("{0}/{1}", MapObject.User.MP, MapObject.User.Stats[Stat.MP]);
+                CritRLabel.Text = string.Format("{0}%", MapObject.User.Stats[Stat.CriticalRate]);
+                CritDLabel.Text = string.Format("{0}", MapObject.User.Stats[Stat.CriticalDamage]);
+                AttkSpdLabel.Text = string.Format("{0}", MapObject.User.Stats[Stat.AttackSpeed]);
+                AccLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.Accuracy]);
+                AgilLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.Agility]);
+                LuckLabel.Text = string.Format("{0}", MapObject.User.Stats[Stat.Luck]);
             };
 
             StatePage = new MirImageControl
@@ -2384,17 +2348,17 @@ namespace Client.MirScenes.Dialogs
             StatePage.BeforeDraw += (o, e) =>
             {
                 ExpPLabel.Text = string.Format("{0:0.##%}", MapObject.User.Experience / (double)MapObject.User.MaxExperience);
-                BagWLabel.Text = string.Format("{0}/{1}", MapObject.User.CurrentBagWeight, MapObject.User.MaxBagWeight);
-                WearWLabel.Text = string.Format("{0}/{1}", MapObject.User.CurrentWearWeight, MapObject.User.MaxWearWeight);
-                HandWLabel.Text = string.Format("{0}/{1}", MapObject.User.CurrentHandWeight, MapObject.User.MaxHandWeight);
-                MagicRLabel.Text = string.Format("+{0}", MapObject.User.MagicResist);
-                PoisonResLabel.Text = string.Format("+{0}", MapObject.User.PoisonResist);
-                HealthRLabel.Text = string.Format("+{0}", MapObject.User.HealthRecovery);
-                ManaRLabel.Text = string.Format("+{0}", MapObject.User.SpellRecovery);
-                PoisonRecLabel.Text = string.Format("+{0}", MapObject.User.PoisonRecovery);
-                HolyTLabel.Text = string.Format("+{0}", MapObject.User.Holy);
-                FreezeLabel.Text = string.Format("+{0}", MapObject.User.Freezing);
-                PoisonAtkLabel.Text = string.Format("+{0}", MapObject.User.PoisonAttack);
+                BagWLabel.Text = string.Format("{0}/{1}", MapObject.User.CurrentBagWeight, MapObject.User.Stats[Stat.BagWeight]);
+                WearWLabel.Text = string.Format("{0}/{1}", MapObject.User.CurrentWearWeight, MapObject.User.Stats[Stat.WearWeight]);
+                HandWLabel.Text = string.Format("{0}/{1}", MapObject.User.CurrentHandWeight, MapObject.User.Stats[Stat.HandWeight]);
+                MagicRLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.MagicResist]);
+                PoisonResLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.PoisonResist]);
+                HealthRLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.HealthRecovery]);
+                ManaRLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.SpellRecovery]);
+                PoisonRecLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.PoisonRecovery]);
+                HolyTLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.Holy]);
+                FreezeLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.Freezing]);
+                PoisonAtkLabel.Text = string.Format("+{0}", MapObject.User.Stats[Stat.PoisonAttack]);
             };
 
 
@@ -2832,8 +2796,6 @@ namespace Client.MirScenes.Dialogs
 
                 StartIndex += 7;
                 RefreshInterface();
-
-                ClearCoolDowns();
             };
 
             BackButton = new MirButton
@@ -2851,8 +2813,6 @@ namespace Client.MirScenes.Dialogs
 
                 StartIndex -= 7;
                 RefreshInterface();
-
-                ClearCoolDowns();
             };
         }
 
@@ -2860,8 +2820,6 @@ namespace Client.MirScenes.Dialogs
         {
             if (Visible) return;
             Visible = true;
-
-            ClearCoolDowns();
         }
 
         public override void Hide()
@@ -2917,16 +2875,6 @@ namespace Client.MirScenes.Dialogs
             StateButton.Index = -1;
             SkillButton.Index = 503;
             StartIndex = 0;
-
-            ClearCoolDowns();
-        }
-
-        private void ClearCoolDowns()
-        {
-            for (int i = 0; i < Magics.Length; i++)
-            {
-                Magics[i].CoolDown.Dispose();
-            }
         }
 
         private void RefreshInterface()
@@ -3299,6 +3247,7 @@ namespace Client.MirScenes.Dialogs
         {
             MapControl map = GameScene.Scene.MapControl;
             if (map == null) return;
+
             MapNameLabel.Text = map.Title;
             LocationLabel.Text = Functions.PointToString(MapObject.User.CurrentLocation);
 
@@ -3308,8 +3257,7 @@ namespace Client.MirScenes.Dialogs
             (GameScene.Scene.MiniMapDialog.Size.Height + 165) - Settings.ScreenHeight);
             GameScene.Scene.MainDialog.PModeLabel.Location = new Point((GameScene.Scene.MiniMapDialog.Location.X - 3) - GameScene.Scene.MainDialog.Location.X,
             (GameScene.Scene.MiniMapDialog.Size.Height + 180) - Settings.ScreenHeight);
-            GameScene.Scene.MainDialog.PingLabel.Location = new Point((GameScene.Scene.MiniMapDialog.Location.X - 3) - GameScene.Scene.MainDialog.Location.X,
-            (GameScene.Scene.MiniMapDialog.Size.Height + 195) - Settings.ScreenHeight);
+
             if (GameScene.Scene.NewMail)
             {
                 double time = (CMain.Time) / 100D;
@@ -4390,7 +4338,7 @@ namespace Client.MirScenes.Dialogs
         public MirButton SkillButton;
         public MirLabel LevelLabel, NameLabel, ExpLabel, KeyLabel;
         public ClientMagic Magic;
-        public MirAnimatedControl CoolDown;
+        public MirImageControl CoolDown;
 
         public MagicButton()
         {
@@ -4457,16 +4405,14 @@ namespace Client.MirScenes.Dialogs
                 NotControl = true,
             };
 
-            CoolDown = new MirAnimatedControl
+            CoolDown = new MirImageControl
             {
                 Library = Libraries.Prguse2,
                 Parent = this,
                 Location = new Point(36, 0),
+                Opacity = 0.6F,
                 NotControl = true,
                 UseOffSet = true,
-                Loop = false,
-                Animated = false,
-                Opacity = 0.6F
             };
         }
 
@@ -4519,29 +4465,19 @@ namespace Client.MirScenes.Dialogs
 
             long timeLeft = Magic.CastTime + Magic.Delay - CMain.Time;
 
-            if (timeLeft < 100 || (CoolDown != null && CoolDown.Animated)) return;
+            if (timeLeft < 100)
+            {
+                CoolDown.Visible = false;
+                return;
+            }
 
             int delayPerFrame = (int)(Magic.Delay / totalFrames);
             int startFrame = totalFrames - (int)(timeLeft / delayPerFrame);
 
-            if ((CMain.Time <= Magic.CastTime + Magic.Delay) && Magic.CastTime > 0)
+            if ((CMain.Time <= Magic.CastTime + Magic.Delay))
             {
-                CoolDown.Dispose();
-
-                CoolDown = new MirAnimatedControl
-                {
-                    Index = 1290 + startFrame,
-                    AnimationCount = (totalFrames - startFrame),
-                    AnimationDelay = delayPerFrame,
-                    Library = Libraries.Prguse2,
-                    Parent = this,
-                    Location = new Point(36, 0),
-                    NotControl = true,
-                    UseOffSet = true,
-                    Loop = false,
-                    Animated = true,
-                    Opacity = 0.6F
-                };
+                CoolDown.Visible = true;
+                CoolDown.Index = 1290 + startFrame;
             }
         }
     }
@@ -5069,8 +5005,8 @@ namespace Client.MirScenes.Dialogs
         {
             int Warning = item.MaxDura / 2;
             int Danger = item.MaxDura / 5;
-            uint AmuletWarning = item.Info.StackSize / 2;
-            uint AmuletDanger = item.Info.StackSize / 5;
+            ushort AmuletWarning = (ushort)(item.Info.StackSize / 2);
+            ushort AmuletDanger = (ushort)(item.Info.StackSize / 5);
 
             switch (item.Info.Type)
             {

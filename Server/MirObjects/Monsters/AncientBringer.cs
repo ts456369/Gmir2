@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System;
 using System.Drawing;
 using Server.MirDatabase;
@@ -9,7 +9,7 @@ using System.Text;
 
 namespace Server.MirObjects.Monsters
 {
-    class AncientBringer : MonsterObject
+    public class AncientBringer : MonsterObject
     {
         protected virtual byte AttackRange
         {
@@ -31,7 +31,6 @@ namespace Server.MirObjects.Monsters
 
         protected override void Attack()
         {
-
             if (!Target.IsAttackTarget(this))
             {
                 Target = null;
@@ -50,12 +49,18 @@ namespace Server.MirObjects.Monsters
                 if (Envir.Random.Next(5) > 0)
                 {
                     Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation });
-                    LineAttack1(2); //Normal Double Punch Attack   
+
+                    int damage = GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC]);
+
+                    PoisonLineAttack(2, damage, DefenceType.ACAgility);
                 }
                 else
                 {
                     Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, Type = 1 });
-                    LineAttack2(3);//Screaming Attack
+
+                    int damage = GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC] * 2);
+
+                    PoisonLineAttack(2, damage, DefenceType.ACAgility, true);
                 }
             }
             else
@@ -63,84 +68,92 @@ namespace Server.MirObjects.Monsters
                 if (Envir.Random.Next(10) > 0)
                 {
                     Broadcast(new S.ObjectRangeAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, TargetID = Target.ObjectID });
-                    RangeAttack1(3);//Normal Ranged Attack                 
+
+                    int damage = GetAttackPower(Stats[Stat.MinMC], Stats[Stat.MaxMC]);
+
+                    int delay = Functions.MaxDistance(CurrentLocation, Target.CurrentLocation) * 50 + 500; //50 MS per Step
+
+                    DelayedAction action = new DelayedAction(DelayedType.RangeDamage, Envir.Time + delay, Target, damage, DefenceType.ACAgility, (byte)4);
+                    ActionList.Add(action);
                 }
                 else
                 {
                     Broadcast(new S.ObjectRangeAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, TargetID = Target.ObjectID, Type = 1 });
-                    RangeAttack2(3);//Range Attack Which Spawns Bats
+
+                    int damage = GetAttackPower(Stats[Stat.MinMC], Stats[Stat.MaxMC] * 2);
+
+                    DelayedAction action = new DelayedAction(DelayedType.RangeDamage, Envir.Time + 500, Target, damage, DefenceType.ACAgility, (byte)5);
+                    ActionList.Add(action);
+
+                    if (damage > 0)
+                    {
+                        SpawnSlaves();
+                    }
                 }
-
             }
-            if (Target.Dead)
-                FindTarget();
         }
 
-        private void LineAttack1(int distance)
+        protected override void CompleteRangeAttack(IList<object> data)
         {
-            int damage = GetAttackPower(MinDC, MaxDC);
-            if (damage == 0) return;
-            Target.Attacked(this, damage, DefenceType.ACAgility);
-        }
+            MapObject target = (MapObject)data[0];
+            int damage = (int)data[1];
+            DefenceType defence = (DefenceType)data[2];
+            byte range = (byte)data[3];
 
-        Cell cell = null;
+            if (target == null || !target.IsAttackTarget(this) || target.CurrentMap != CurrentMap || target.Node == null) return;
 
-        private void LineAttack2(int distance)
-        {
-            MirDirection dir = Functions.DirectionFromPoint(Target.CurrentLocation, CurrentLocation);
-            dir = Functions.NextDir(dir);
-            Point target = Functions.PointMove(CurrentLocation, dir, 1);
+            var targets = FindAllTargets(range, target.CurrentLocation);
 
-            int damage = GetAttackPower(MinDC, MaxDC * 2);
-            if (damage == 0) return;
-            Target.Attacked(this, damage, DefenceType.ACAgility);
-
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < targets.Count; i++)
             {
-                target = Functions.PointMove(CurrentLocation, dir, 1);
-                dir = Functions.NextDir(dir);
+                targets[i].Attacked(this, damage, defence);
+            }
+        }
+
+        protected override void CompleteAttack(IList<object> data)
+        {
+            MapObject target = (MapObject)data[0];
+            int damage = (int)data[1];
+            DefenceType defence = (DefenceType)data[2];
+            bool poison = (bool)data[3];
+
+            if (target == null || !target.IsAttackTarget(this) || target.CurrentMap != CurrentMap || target.Node == null) return;
+
+            var finalDamage = target.Attacked(this, damage, defence);
+
+            if (finalDamage > 0 && poison)
+            {
+                PoisonTarget(target, 5, 5, PoisonType.Paralysis, 2000);
+            }
+        }
+
+        protected void PoisonLineAttack(int distance, int additionalDelay = 500, DefenceType defenceType = DefenceType.ACAgility, bool poison = false)
+        {
+            int damage = GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC]);
+            if (damage == 0) return;
+
+            for (int i = 1; i <= distance; i++)
+            {
+                Point target = Functions.PointMove(CurrentLocation, Direction, i);
 
                 if (!CurrentMap.ValidPoint(target)) continue;
 
-                cell = CurrentMap.GetCell(target);
-
+                Cell cell = CurrentMap.GetCell(target);
                 if (cell.Objects == null) continue;
 
                 for (int o = 0; o < cell.Objects.Count; o++)
                 {
                     MapObject ob = cell.Objects[o];
-                    if (ob.Race != ObjectType.Player && ob.Race != ObjectType.Monster) continue;
-                    if (!ob.IsAttackTarget(this)) continue;
-
-                    ob.Attacked(this, damage, DefenceType.ACAgility);
-
-                    if (Envir.Random.Next(Settings.PoisonResistWeight) >= Target.PoisonResist)
+                    if (ob.Race == ObjectType.Monster || ob.Race == ObjectType.Player)
                     {
-                        if (Envir.Random.Next(5) == 0)
-                        {
-                            Target.ApplyPoison(new Poison { Owner = this, Duration = 5, PType = PoisonType.Paralysis, Value = GetAttackPower(MinSC, MaxSC), TickSpeed = 2000 }, this);
-                        }
+                        if (!ob.IsAttackTarget(this)) continue;
+
+                        DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, ob, damage, defenceType, poison);
+                        ActionList.Add(action);
+
                     }
-                    break;
                 }
             }
-        }
-
-        private void RangeAttack1(int distance)
-        {
-            int damage = GetAttackPower(MinMC, MaxMC);
-            if (damage == 0) return;
-            DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, Target, damage, DefenceType.MAC);
-            Target.Attacked(this, damage, DefenceType.MACAgility);
-        }
-
-        private void RangeAttack2(int distance)
-        {
-            int damage = GetAttackPower(MinMC, MaxMC * 2);
-            if (damage == 0) return;
-            Target.Attacked(this, damage, DefenceType.MACAgility);
-
-            SpawnSlaves();
         }
 
         private void SpawnSlaves()
@@ -152,8 +165,7 @@ namespace Server.MirObjects.Monsters
 
             for (int i = 0; i < count; i++)
             {
-                MonsterObject mob = null;
-                mob = GetMonster(Envir.GetMonsterInfo(Settings.AncientBatName));                
+                MonsterObject mob = GetMonster(Envir.GetMonsterInfo(Settings.AncientBatName));                
                 if (mob == null) continue;
 
                 if (!mob.Spawn(CurrentMap, Target.CurrentLocation))
@@ -163,7 +175,6 @@ namespace Server.MirObjects.Monsters
                 mob.ActionTime = Envir.Time + 2000;
                 SlaveList.Add(mob);
             }
-
         }
 
         protected override void ProcessTarget()
@@ -183,8 +194,6 @@ namespace Server.MirObjects.Monsters
             }
 
             MoveTo(Target.CurrentLocation);
-
         }
-
     }
 }

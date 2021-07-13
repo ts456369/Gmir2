@@ -112,7 +112,9 @@ namespace Server.MirObjects
 
         public float PriceRate(PlayerObject player, bool baseRate = false)
         {
-            if (!(Envir.GetObject(player.NPCObjectID) is NPCObject callingNPC)) 
+            var callingNPC = Envir.NPCs.SingleOrDefault(x => x.ObjectID == player.NPCObjectID);
+
+            if (callingNPC == null)
             {
                 return 1F;
             }
@@ -183,6 +185,8 @@ namespace Server.MirObjects
 
             if (loadedNPC != null)
             {
+                loadedNPC.UsedGoods.Clear();
+
                 string path = Path.Combine(Settings.GoodsPath, loadedNPC.Info.Index.ToString() + ".msd");
 
                 if (!File.Exists(path)) return;
@@ -587,6 +591,10 @@ namespace Server.MirObjects
                                 if (parts.Length > 2)
                                     gotoButtons.Add(string.Format("[{0}]", parts[2].ToUpper()));
                                 break;
+                            case "ROLLDIE":
+                            case "ROLLYUT":
+                                buttons.Add(string.Format("[{0}]", parts[1].ToUpper()));
+                                break;
                         }
                 }
 
@@ -603,7 +611,6 @@ namespace Server.MirObjects
 
             for (int i = 0; i < elseActs.Count; i++)
                 segment.ParseAct(segment.ElseActList, elseActs[i]);
-
 
             currentButtons = new List<string>();
             currentButtons.AddRange(buttons);
@@ -665,9 +672,10 @@ namespace Server.MirObjects
                         MessageQueue.Enqueue(string.Format("Could not find Item: {0}, File: {1}", lines[i], FileName));
                         continue;
                     }
-                    uint count = 1;
+
+                    ushort count = 1;
                     if (data.Length == 2)
-                        uint.TryParse(data[1], out count);
+                        ushort.TryParse(data[1], out count);
 
                     goods.Count = count;
 
@@ -851,7 +859,7 @@ namespace Server.MirObjects
                 player.NPCDelayed = false;
             }
 
-            if (key.StartsWith("[@@") && player.NPCInputStr == string.Empty)
+            if (key.StartsWith("[@@") && !player.NPCData.TryGetValue("NPCInputStr", out object _npcInputStr))
             {
                 //send off packet to request input
                 player.Enqueue(new S.NPCRequestInput { NPCID = player.NPCObjectID, PageName = key });
@@ -880,8 +888,7 @@ namespace Server.MirObjects
                 Response(player, page);
             }
 
-
-            player.NPCInputStr = string.Empty;
+            player.NPCData.Remove("NPCInputStr");
         }
 
         private void Response(PlayerObject player, NPCPage page)
@@ -1094,7 +1101,7 @@ namespace Server.MirObjects
             }
         }
 
-        public void Buy(PlayerObject player, ulong index, uint count)
+        public void Buy(PlayerObject player, ulong index, ushort count)
         {
             UserItem goods = null;
 
@@ -1203,7 +1210,7 @@ namespace Server.MirObjects
         {
             /* Handle Item Sale */
         }
-        public void Craft(PlayerObject player, ulong index, uint count, int[] slots)
+        public void Craft(PlayerObject player, ulong index, ushort count, int[] slots)
         {
             S.CraftItem p = new S.CraftItem();
 
@@ -1267,7 +1274,13 @@ namespace Server.MirObjects
             //Check Ingredients
             foreach (var ingredient in recipe.Ingredients)
             {
-                uint amount = ingredient.Count * count;
+                if (ingredient.Count * count > ingredient.Info.StackSize)
+                {
+                    player.Enqueue(p);
+                    return;
+                }
+
+                ushort amount = (ushort)(ingredient.Count * count);
 
                 for (int i = 0; i < slots.Length; i++)
                 {
@@ -1319,7 +1332,7 @@ namespace Server.MirObjects
             }
 
             UserItem craftedItem = Envir.CreateFreshItem(goods.Info);
-            craftedItem.Count = goods.Count * count;
+            craftedItem.Count = (ushort)(goods.Count * count);
 
             if (!player.CanGainItem(craftedItem))
             {
@@ -1355,7 +1368,7 @@ namespace Server.MirObjects
             //Take Ingredients
             foreach (var ingredient in recipe.Ingredients)
             {
-                uint amount = ingredient.Count * count;
+                ushort amount = (ushort)(ingredient.Count * count);
 
                 for (int i = 0; i < slots.Length; i++)
                 {
@@ -1392,7 +1405,7 @@ namespace Server.MirObjects
             player.Account.Gold -= recipe.Gold;
             player.Enqueue(new S.LoseGold { Gold = recipe.Gold });
 
-            if (Envir.Random.Next(100) >= recipe.Chance)
+            if (Envir.Random.Next(100) >= recipe.Chance + player.Stats[Stat.CraftRatePercent])
             {
                 player.ReceiveChat("Crafting attempt failed.", ChatType.System);
             }

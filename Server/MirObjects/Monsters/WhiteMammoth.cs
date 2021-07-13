@@ -1,4 +1,5 @@
-﻿using Server.MirDatabase;
+using Server.MirDatabase;
+using System.Collections.Generic;
 using S = ServerPackets;
 
 namespace Server.MirObjects.Monsters
@@ -29,16 +30,22 @@ namespace Server.MirObjects.Monsters
                 else
                 {
                     Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, Type = 1 });
-                    int damage = GetAttackPower(MinDC, MaxDC * 2);
+                    int damage = GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC] * 2);
                     if (damage == 0) return;
-                    Target.Attacked(this, damage);
-                }
-                
+
+                    DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, Target, damage, DefenceType.ACAgility, false);
+                    ActionList.Add(action);
+                }       
             }
             else
             {
                 Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, Type = 2 });
-                Attack3();
+
+                int damage = GetAttackPower(Stats[Stat.MinMC], Stats[Stat.MaxMC]);
+                if (damage == 0) return;
+
+                DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, Target, damage, DefenceType.ACAgility, true);
+                ActionList.Add(action);
             }
 
             ShockTime = 0;
@@ -46,16 +53,35 @@ namespace Server.MirObjects.Monsters
             AttackTime = Envir.Time + AttackSpeed;
 
         }
-        private void Attack3()
-        {
-            int damage = GetAttackPower(MinDC, MaxDC);
-            if (damage == 0) return;
-            Target.Attacked(this, damage);
 
-            if (Envir.Random.Next(Settings.PoisonResistWeight) >= Target.PoisonResist)
+        protected override void CompleteAttack(IList<object> data)
+        {
+            int damage = (int)data[1];
+
+            if (data.Count >= 4)
             {
-                Target.ApplyPoison(new Poison { Owner = this, Duration = 3, PType = PoisonType.Stun, TickSpeed = 2000 }, this);
+                bool stomp = (bool)data[3];
+
+                if (stomp)
+                {
+                    List<MapObject> targets = FindAllTargets(1, CurrentLocation, false);
+
+                    for (int i = 0; i < targets.Count; i++)
+                    {
+                        var target = targets[i];
+
+                        if (target == null || !target.IsAttackTarget(this) || target.CurrentMap != CurrentMap || target.Node == null) continue;
+
+                        if (target.Attacked(this, damage) <= 0) continue;
+
+                        PoisonTarget(target, 0, 5, PoisonType.Dazed, 2000);
+                    }
+
+                    return;
+                }
             }
+
+            base.CompleteAttack(data);
         }
     }
 }

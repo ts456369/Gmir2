@@ -15,44 +15,41 @@ namespace Server.MirObjects.Monsters
 
         protected override void Attack()
         {
-
             if (!Target.IsAttackTarget(this))
             {
                 Target = null;
                 return;
             }
 
+            ActionTime = Envir.Time + 300;
+            AttackTime = Envir.Time + AttackSpeed;
+
             Direction = Functions.DirectionFromPoint(CurrentLocation, Target.CurrentLocation);
 
             if (Envir.Random.Next(5) > 0)
             {
-                int damage = GetAttackPower(MinDC, MaxDC);
-                if (damage == 0) return;
-                Target.Attacked(this, damage, DefenceType.ACAgility);
+                Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, Type = 0 });
+
+                int damage = GetAttackPower(Stats[Stat.MinDC], Stats[Stat.MaxDC]);
+                if (damage == 0) return; 
+                
+                DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, Target, damage, DefenceType.ACAgility);
+                ActionList.Add(action);
             }
             else
             {
                 Broadcast(new S.ObjectAttack { ObjectID = ObjectID, Direction = Direction, Location = CurrentLocation, Type = 1 });
 
-                int damage = GetAttackPower(MinDC, MaxDC);
+                int damage = GetAttackPower(Stats[Stat.MinMC], Stats[Stat.MaxMC]);
                 if (damage == 0) return;
-                Target.Attacked(this, damage, DefenceType.ACAgility);
 
-                if (Envir.Random.Next(Settings.PoisonResistWeight) >= Target.PoisonResist)
-                {
-                    if (Envir.Random.Next(8) == 0)
-                        Target.ApplyPoison(new Poison { Owner = this, Duration = 6, PType = PoisonType.Stun, Value = GetAttackPower(MinSC, MaxSC), TickSpeed = 2000 }, this);
-                }
+                DelayedAction action = new DelayedAction(DelayedType.Damage, Envir.Time + 300, Target, damage, DefenceType.ACAgility);
+                ActionList.Add(action);
+
+                PoisonTarget(Target, 8, 6, PoisonType.Dazed, 1000);
             }
 
-
-            ActionTime = Envir.Time + 300;
-            AttackTime = Envir.Time + AttackSpeed;
             ShockTime = 0;
-
-
         }
-
-        
     }
 }

@@ -166,6 +166,7 @@
     <Compile Include="MirScenes\Dialogs\BuffDialog.cs" />
     <Compile Include="MirScenes\Dialogs\ChatNoticeDialog.cs" />
     <Compile Include="MirScenes\Dialogs\ChatOptionDialog.cs" />
+    <Compile Include="MirScenes\Dialogs\CompassDialog.cs" />
     <Compile Include="MirScenes\Dialogs\FishingDialog.cs" />
     <Compile Include="MirScenes\Dialogs\FriendDialog.cs" />
     <Compile Include="MirScenes\Dialogs\GameshopDialog.cs" />
@@ -180,6 +181,7 @@
     <Compile Include="MirScenes\Dialogs\MentorDialog.cs" />
     <Compile Include="MirScenes\Dialogs\MountDialog.cs" />
     <Compile Include="MirScenes\Dialogs\NoticeDialog.cs" />
+    <Compile Include="MirScenes\Dialogs\RollDialog.cs" />
     <Compile Include="MirScenes\Dialogs\SocketDialog.cs" />
     <Compile Include="MirScenes\Dialogs\TimerDialog.cs" />
     <Compile Include="MirScenes\Dialogs\TrustMerchantDialog.cs" />
